@@ -50,10 +50,13 @@
 #define CONFIG_SYS_I2C
 #define CONFIG_SYS_I2C_MXC
 #define CONFIG_SYS_I2C_MXC_I2C2		/* Enable I2C bus 2 */
+#define CONFIG_SYS_I2C_MXC_I2C4		/* Enable I2C bus 4 */
 #define CONFIG_SYS_I2C_SPEED		100000
 #define SYS_I2C_BUS_SOM			0
+#define CL_SOM_IMX7_I2C_BUS_EXT		1
 
 #define CONFIG_SYS_I2C_EEPROM_ADDR	0x50
+#define CL_SOM_IMX7_I2C_EEPROM_EXT	0x54
 #define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	1
 #define CONFIG_SYS_I2C_EEPROM_BUS	SYS_I2C_BUS_SOM
 
@@ -82,9 +85,8 @@
 	"console=ttymxc0\0" \
 	"fdt_high=0xffffffff\0" \
 	"initrd_high=0xffffffff\0" \
-	"fdtfile=imx7d-sbc-imx7.dtb\0" \
 	"fdtaddr=0x83000000\0" \
-	"mmcdev_def="__stringify(CONFIG_SYS_MMC_DEV)"\0" \
+	"mmcdev_def="__stringify(CONFIG_SYS_MMC_ENV_DEV)"\0" \
 	"usbdev_def="__stringify(CONFIG_SYS_USB_DEV)"\0" \
 	"mmcpart=" __stringify(CONFIG_SYS_MMC_IMG_LOAD_PART) "\0" \
 	"usbpart=" __stringify(CONFIG_SYS_USB_IMG_LOAD_PART) "\0" \
@@ -121,6 +123,9 @@
 	"sdboot=setenv mmcdev ${mmcdev_def}; setenv mmcblk 0; run mmcboot\0" \
 	"emmcbootscript=setenv mmcdev 1; setenv mmcblk 2; run mmcbootscript\0" \
 	"emmcboot=setenv mmcdev 1; setenv mmcblk 2; run mmcboot\0" \
+	"baseboard_i2c_enable=true\0" \
+
+#define CONFIG_PREBOOT                 "usb start"
 
 #define CONFIG_BOOTCOMMAND \
 	"echo SD boot attempt ...; run sdbootscript; run sdboot; " \
@@ -154,13 +159,19 @@
 #define CONFIG_SF_DEFAULT_MODE		(SPI_MODE_0)
 
 /* FLASH and environment organization */
-#define CONFIG_ENV_SIZE			SZ_8K
-#define CONFIG_ENV_OFFSET		(768 * 1024)
-#define CONFIG_ENV_SECT_SIZE		(64 * 1024)
-#define CONFIG_ENV_SPI_BUS		CONFIG_SF_DEFAULT_BUS
-#define CONFIG_ENV_SPI_CS		CONFIG_SF_DEFAULT_CS
-#define CONFIG_ENV_SPI_MODE		CONFIG_SF_DEFAULT_MODE
-#define CONFIG_ENV_SPI_MAX_HZ		CONFIG_SF_DEFAULT_SPEED
+#define CONFIG_ENV_SIZE			(128 * 1024)
+#define CONFIG_SYS_REDUNDAND_ENVIRONMENT
+#define CONFIG_SYS_MMC_ENV_DEV			0
+
+/* EEPROM */
+#define CONFIG_CMD_EEPROM
+#define CONFIG_ENV_EEPROM_IS_ON_I2C
+#define CONFIG_SYS_EEPROM_PAGE_WRITE_BITS      4
+#define CONFIG_SYS_EEPROM_PAGE_WRITE_DELAY_MS  5
+#define CONFIG_SYS_EEPROM_SIZE                 256
+
+#define CONFIG_CMD_EEPROM_LAYOUT
+#define CONFIG_EEPROM_LAYOUT_HELP_STRING "v2, v3"
 
 /* MMC Config*/
 #define CONFIG_FSL_USDHC
@@ -177,6 +188,9 @@
 #define CONFIG_MXC_USB_PORTSC  (PORT_PTS_UTMI | PORT_PTS_PTW)
 #define CONFIG_MXC_USB_FLAGS   0
 #define CONFIG_USB_MAX_CONTROLLER_COUNT 2
+#define CONFIG_USB_KEYBOARD
+#define CONFIG_SYS_USB_EVENT_POLL_VIA_CONTROL_EP
+#define CONFIG_SYS_STDIO_DEREGISTER
 
 /* Uncomment to enable iMX thermal driver support */
 /*#define CONFIG_IMX_THERMAL*/
@@ -187,5 +201,9 @@
 #define CONFIG_SPL_SPI_LOAD
 #define CONFIG_SYS_SPI_U_BOOT_OFFS	(64 * 1024)
 #endif /* CONFIG_SPL_BUILD */
+
+/* Miscellaneous */
+#define CONFIG_DISPLAY_BOARDINFO_LATE
+#define CONFIG_SUPPORT_RAW_INITRD
 
 #endif	/* __CONFIG_H */

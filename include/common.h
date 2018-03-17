@@ -268,6 +268,8 @@ void	fdc_hw_init   (void);
 void eeprom_init  (int bus);
 int  eeprom_read  (unsigned dev_addr, unsigned offset, uchar *buffer, unsigned cnt);
 int  eeprom_write (unsigned dev_addr, unsigned offset, uchar *buffer, unsigned cnt);
+int  eeprom_read_i2c  (int i2c_bus, unsigned dev_addr, unsigned offset, uchar *buffer, unsigned cnt);
+int  eeprom_write_i2c (int i2c_bus, unsigned dev_addr, unsigned offset, uchar *buffer, unsigned cnt);
 #else
 /*
  * Some EEPROM code is depecated because it used the legacy I2C interface. Add
@@ -276,6 +278,8 @@ int  eeprom_write (unsigned dev_addr, unsigned offset, uchar *buffer, unsigned c
 #define eeprom_init(bus)
 #define eeprom_read(dev_addr, offset, buffer, cnt) ((void)-ENOSYS)
 #define eeprom_write(dev_addr, offset, buffer, cnt) ((void)-ENOSYS)
+#define eeprom_read_i2c(i2c_bus, dev_addr, offset, buffer, cnt) ((void)-ENOSYS)
+#define eeprom_write_i2c(i2c_bus, dev_addr, offset, buffer, cnt) ((void)-ENOSYS)
 #endif
 
 #if !defined(CONFIG_ENV_EEPROM_IS_ON_I2C) && defined(CONFIG_SYS_I2C_EEPROM_ADDR)

@@ -186,6 +186,42 @@ int cl_eeprom_get_product_name(uchar *buf, uint eeprom_bus)
 }
 
 #ifdef CONFIG_CMD_EEPROM_LAYOUT
+
+/*
+ * Routine: cl_eeprom_layout_setup
+ * Description:
+ * - Read EEPROM content.
+ * - Setup layout struct with the layout data and metadata.
+ *
+ * @layout:    A pointer to an existing struct layout.
+ * @eeprom_buf:        A buffer initialized with the eeprom data.
+ * @layout version: The version number of the layout.
+ * @eeprom_bus: EEPROM I2C bus ID.
+ * @eeprom_addr: EEPROM I2C address.
+ *
+ * @return: 0 on success, < 0 on failure
+ */
+int cl_eeprom_layout_setup(struct eeprom_layout *layout, uchar *eeprom_buf,
+                           int layout_version, uint eeprom_bus,
+			   uint8_t eeprom_addr)
+{
+	int ret;
+
+	ret = i2c_set_bus_num(eeprom_bus);
+	if (ret < 0)
+		return ret;
+
+	ret = i2c_read(eeprom_addr, 0, CONFIG_SYS_I2C_EEPROM_ADDR_LEN,
+		       eeprom_buf, CONFIG_SYS_EEPROM_SIZE);
+	if (ret < 0)
+		return ret;
+
+	eeprom_layout_setup(layout, eeprom_buf, CONFIG_SYS_EEPROM_SIZE,
+			    layout_version);
+
+	return 0;
+}
+
 /**
  * eeprom_field_print_bin_ver() - print a "version field" which contains binary
  *				  data
@@ -198,17 +234,19 @@ int cl_eeprom_get_product_name(uchar *buf, uint eeprom_bus)
  *      Field Name      123.45
  *
  * @field:	an initialized field to print
+ * @fbuf:	field data buffer
  */
-void eeprom_field_print_bin_ver(const struct eeprom_field *field)
+void eeprom_field_print_bin_ver(const struct eeprom_field *field, const unsigned char *fbuf)
 {
-	if ((field->buf[0] == 0xff) && (field->buf[1] == 0xff)) {
-		field->buf[0] = 0;
-		field->buf[1] = 0;
+	int ver = fbuf[1] << 8 | fbuf[0];
+
+	if (ver == 0xffff) {
+		ver = 0;
 	}
 
 	printf(PRINT_FIELD_SEGMENT, field->name);
-	int major = (field->buf[1] << 8 | field->buf[0]) / 100;
-	int minor = (field->buf[1] << 8 | field->buf[0]) - major * 100;
+	int major = ver / 100;
+	int minor = ver - major * 100;
 	printf("%d.%02d\n", major, minor);
 }
 
@@ -224,11 +262,12 @@ void eeprom_field_print_bin_ver(const struct eeprom_field *field)
  * field if there's any deviation from it. It also protects from overflow.
  *
  * @field:	an initialized field
+ * @fbuf:	field data buffer
  * @value:	a version string
  *
  * Returns 0 on success, -1 on failure.
  */
-int eeprom_field_update_bin_ver(struct eeprom_field *field, char *value)
+int eeprom_field_update_bin_ver(struct eeprom_field *field, unsigned char *fbuf, char *value)
 {
 	char *endptr;
 	char *tok = strtok(value, ".");
@@ -251,10 +290,15 @@ int eeprom_field_update_bin_ver(struct eeprom_field *field, char *value)
 	if (num >> 16)
 		return -1;
 
-	field->buf[0] = (unsigned char)num;
-	field->buf[1] = num >> 8;
+	fbuf[0] = (unsigned char)num;
+	fbuf[1] = num >> 8;
 
 	return 0;
+}
+
+void eeprom_field_read_bin_ver(const struct eeprom_field *field, const unsigned char *fbuf, unsigned char *buf)
+{
+	eeprom_field_read_bin(field, fbuf, buf);
 }
 
 char *months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -269,17 +313,18 @@ char *months[12] = {"Jan", "Feb", "Mar", "Apr", "May", "Jun",
  *      Field Name      56/BAD/9999
  *
  * @field:	an initialized field to print
+ * @fbuf:	field data buffer
  */
-void eeprom_field_print_date(const struct eeprom_field *field)
+void eeprom_field_print_date(const struct eeprom_field *field, const unsigned char *fbuf)
 {
 	printf(PRINT_FIELD_SEGMENT, field->name);
-	printf("%02d/", field->buf[0]);
-	if (field->buf[1] >= 1 && field->buf[1] <= 12)
-		printf("%s", months[field->buf[1] - 1]);
+	printf("%02d/", fbuf[0]);
+	if (fbuf[1] >= 1 && fbuf[1] <= 12)
+		printf("%s", months[fbuf[1] - 1]);
 	else
 		printf("BAD");
 
-	printf("/%d\n", field->buf[3] << 8 | field->buf[2]);
+	printf("/%d\n", fbuf[3] << 8 | fbuf[2]);
 }
 
 static int validate_date(unsigned char day, unsigned char month,
@@ -337,11 +382,12 @@ static int validate_date(unsigned char day, unsigned char month,
  * year value, and checks the validity of the date.
  *
  * @field:	an initialized field
+ * @fbuf:	field data buffer
  * @value:	a date string
  *
  * Returns 0 on success, -1 on failure.
  */
-int eeprom_field_update_date(struct eeprom_field *field, char *value)
+int eeprom_field_update_date(struct eeprom_field *field, unsigned char *fbuf, char *value)
 {
 	char *endptr;
 	char *tok1 = strtok(value, "/");
@@ -380,31 +426,36 @@ int eeprom_field_update_date(struct eeprom_field *field, char *value)
 		return -1;
 	}
 
-	field->buf[0] = day;
-	field->buf[1] = month;
-	field->buf[2] = (unsigned char)year;
-	field->buf[3] = (unsigned char)(year >> 8);
+	fbuf[0] = day;
+	fbuf[1] = month;
+	fbuf[2] = (unsigned char)year;
+	fbuf[3] = (unsigned char)(year >> 8);
 
 	return 0;
+}
+
+void eeprom_field_read_date(const struct eeprom_field *field, const unsigned char *fbuf, unsigned char *buf)
+{
+	return eeprom_field_read_bin(field, fbuf, buf);
 }
 
 #define	LAYOUT_VERSION_LEGACY 1
 #define	LAYOUT_VERSION_VER1 2
 #define	LAYOUT_VERSION_VER2 3
 #define	LAYOUT_VERSION_VER3 4
+#define	LAYOUT_VERSION_VER4 5
 
 extern struct eeprom_field layout_unknown[1];
 
-#define DEFINE_PRINT_UPDATE(x) eeprom_field_print_##x, eeprom_field_update_##x
+#define DEFINE_FIELD_FUNCS(x) eeprom_field_print_##x, eeprom_field_update_##x, eeprom_field_read_##x
 
 #ifdef CONFIG_CM_T3X
 struct eeprom_field layout_legacy[5] = {
-	{ "MAC address",          6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "Board Revision",       2, NULL, DEFINE_PRINT_UPDATE(bin) },
-	{ "Serial Number",        8, NULL, DEFINE_PRINT_UPDATE(bin) },
-	{ "Board Configuration", 64, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ RESERVED_FIELDS,      176, NULL, eeprom_field_print_reserved,
-					   eeprom_field_update_ascii },
+	{ "MAC address",          6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Board Revision",       2, DEFINE_FIELD_FUNCS(bin) },
+	{ "Serial Number",        8, DEFINE_FIELD_FUNCS(bin) },
+	{ "Board Configuration", 64, DEFINE_FIELD_FUNCS(ascii) },
+	{ RESERVED_FIELDS,      176, DEFINE_FIELD_FUNCS(reserved) },
 };
 #else
 #define layout_legacy layout_unknown
@@ -412,63 +463,84 @@ struct eeprom_field layout_legacy[5] = {
 
 #if defined(CONFIG_CM_T3X) || defined(CONFIG_CM_T3517)
 struct eeprom_field layout_v1[12] = {
-	{ "Major Revision",      2, NULL, DEFINE_PRINT_UPDATE(bin_ver) },
-	{ "Minor Revision",      2, NULL, DEFINE_PRINT_UPDATE(bin_ver) },
-	{ "1st MAC Address",     6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "2nd MAC Address",     6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "Production Date",     4, NULL, DEFINE_PRINT_UPDATE(date) },
-	{ "Serial Number",      12, NULL, DEFINE_PRINT_UPDATE(bin_rev) },
-	{ RESERVED_FIELDS,      96, NULL, DEFINE_PRINT_UPDATE(reserved) },
-	{ "Product Name",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #1", 16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #2", 16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #3", 16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ RESERVED_FIELDS,      64, NULL, eeprom_field_print_reserved,
-					  eeprom_field_update_ascii },
+	{ "Major Revision",      2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "Minor Revision",      2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "1st MAC Address",     6, DEFINE_FIELD_FUNCS(mac) },
+	{ "2nd MAC Address",     6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Production Date",     4, DEFINE_FIELD_FUNCS(date) },
+	{ "Serial Number",      12, DEFINE_FIELD_FUNCS(bin_rev) },
+	{ RESERVED_FIELDS,      96, DEFINE_FIELD_FUNCS(reserved) },
+	{ "Product Name",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #1", 16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #2", 16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #3", 16, DEFINE_FIELD_FUNCS(ascii) },
+	{ RESERVED_FIELDS,      64, DEFINE_FIELD_FUNCS(reserved) },
 };
 #else
 #define layout_v1 layout_unknown
 #endif
 
 struct eeprom_field layout_v2[15] = {
-	{ "Major Revision",            2, NULL, DEFINE_PRINT_UPDATE(bin_ver) },
-	{ "Minor Revision",            2, NULL, DEFINE_PRINT_UPDATE(bin_ver) },
-	{ "1st MAC Address",           6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "2nd MAC Address",           6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "Production Date",           4, NULL, DEFINE_PRINT_UPDATE(date) },
-	{ "Serial Number",            12, NULL, DEFINE_PRINT_UPDATE(bin_rev) },
-	{ "3rd MAC Address (WIFI)",    6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "4th MAC Address (Bluetooth)", 6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "Layout Version",            1, NULL, DEFINE_PRINT_UPDATE(bin) },
-	{ RESERVED_FIELDS,            83, NULL, DEFINE_PRINT_UPDATE(reserved) },
-	{ "Product Name",             16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #1",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #2",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #3",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ RESERVED_FIELDS,            64, NULL, eeprom_field_print_reserved,
-						eeprom_field_update_ascii },
+	{ "Major Revision",            2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "Minor Revision",            2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "1st MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "2nd MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Production Date",           4, DEFINE_FIELD_FUNCS(date) },
+	{ "Serial Number",            12, DEFINE_FIELD_FUNCS(bin_rev) },
+	{ "3rd MAC Address (WIFI)",    6, DEFINE_FIELD_FUNCS(mac) },
+	{ "4th MAC Address (Bluetooth)", 6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Layout Version",            1, DEFINE_FIELD_FUNCS(bin) },
+	{ RESERVED_FIELDS,            83, DEFINE_FIELD_FUNCS(reserved) },
+	{ "Product Name",             16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #1",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #2",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #3",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ RESERVED_FIELDS,            64, DEFINE_FIELD_FUNCS(reserved) },
 };
 
 struct eeprom_field layout_v3[16] = {
-	{ "Major Revision",            2, NULL, DEFINE_PRINT_UPDATE(bin_ver) },
-	{ "Minor Revision",            2, NULL, DEFINE_PRINT_UPDATE(bin_ver) },
-	{ "1st MAC Address",           6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "2nd MAC Address",           6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "Production Date",           4, NULL, DEFINE_PRINT_UPDATE(date) },
-	{ "Serial Number",            12, NULL, DEFINE_PRINT_UPDATE(bin_rev) },
-	{ "3rd MAC Address (WIFI)",    6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "4th MAC Address (Bluetooth)", 6, NULL, DEFINE_PRINT_UPDATE(mac) },
-	{ "Layout Version",            1, NULL, DEFINE_PRINT_UPDATE(bin) },
-	{ "CompuLab EEPROM ID",        3, NULL, DEFINE_PRINT_UPDATE(bin) },
-	{ RESERVED_FIELDS,            80, NULL, DEFINE_PRINT_UPDATE(reserved) },
-	{ "Product Name",             16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #1",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #2",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ "Product Options #3",       16, NULL, DEFINE_PRINT_UPDATE(ascii) },
-	{ RESERVED_FIELDS,            64, NULL, eeprom_field_print_reserved,
-						eeprom_field_update_ascii },
+	{ "Major Revision",            2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "Minor Revision",            2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "1st MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "2nd MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Production Date",           4, DEFINE_FIELD_FUNCS(date) },
+	{ "Serial Number",            12, DEFINE_FIELD_FUNCS(bin_rev) },
+	{ "3rd MAC Address (WIFI)",    6, DEFINE_FIELD_FUNCS(mac) },
+	{ "4th MAC Address (Bluetooth)", 6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Layout Version",            1, DEFINE_FIELD_FUNCS(bin) },
+	{ "CompuLab EEPROM ID",        3, DEFINE_FIELD_FUNCS(bin) },
+	{ RESERVED_FIELDS,            80, DEFINE_FIELD_FUNCS(reserved) },
+	{ "Product Name",             16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #1",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #2",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #3",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ RESERVED_FIELDS,            64, DEFINE_FIELD_FUNCS(reserved) },
 };
 
+struct eeprom_field layout_v4[21] = {
+	{ "Major Revision",            2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "Minor Revision",            2, DEFINE_FIELD_FUNCS(bin_ver) },
+	{ "1st MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "2nd MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Production Date",           4, DEFINE_FIELD_FUNCS(date) },
+	{ "Serial Number",            12, DEFINE_FIELD_FUNCS(bin_rev) },
+	{ "3rd MAC Address (WIFI)",    6, DEFINE_FIELD_FUNCS(mac) },
+	{ "4th MAC Address (Bluetooth)", 6, DEFINE_FIELD_FUNCS(mac) },
+	{ "Layout Version",            1, DEFINE_FIELD_FUNCS(bin) },
+	{ "CompuLab EEPROM ID",        3, DEFINE_FIELD_FUNCS(bin) },
+	{ "5th MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ "6th MAC Address",           6, DEFINE_FIELD_FUNCS(mac) },
+	{ RESERVED_FIELDS,             4, DEFINE_FIELD_FUNCS(reserved) },
+	{ RESERVED_FIELDS,            64, DEFINE_FIELD_FUNCS(reserved) },
+	{ "Product Name",             16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #1",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #2",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #3",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #4",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ "Product Options #5",       16, DEFINE_FIELD_FUNCS(ascii) },
+	{ RESERVED_FIELDS,            32, DEFINE_FIELD_FUNCS(reserved) },
+};
+ 
 void eeprom_layout_assign(struct eeprom_layout *layout, int layout_version)
 {
 	switch (layout->layout_version) {
@@ -488,6 +560,10 @@ void eeprom_layout_assign(struct eeprom_layout *layout, int layout_version)
 		layout->fields = layout_v3;
 		layout->num_of_fields = ARRAY_SIZE(layout_v3);
 		break;
+	case LAYOUT_VERSION_VER4:
+		layout->fields = layout_v4;
+		layout->num_of_fields = ARRAY_SIZE(layout_v4);
+		break;
 	default:
 		__eeprom_layout_assign(layout, layout_version);
 	}
@@ -503,6 +579,8 @@ int eeprom_parse_layout_version(char *str)
 		return LAYOUT_VERSION_VER2;
 	else if (!strcmp(str, "v3"))
 		return LAYOUT_VERSION_VER3;
+	else if (!strcmp(str, "v4"))
+		return LAYOUT_VERSION_VER4;
 	else
 		return LAYOUT_VERSION_UNRECOGNIZED;
 }
@@ -517,6 +595,8 @@ int eeprom_layout_detect(unsigned char *data)
 		return LAYOUT_VERSION_VER2;
 	case 3:
 		return LAYOUT_VERSION_VER3;
+	case 4 ... 0x1f:
+		return LAYOUT_VERSION_VER4;
 	}
 
 	if (data[EEPROM_LAYOUT_VER_OFFSET] >= 0x20)

@@ -40,6 +40,7 @@ struct mxs_bch_regs {
 	mxs_reg_32(hw_bch_dbgahbmread)
 	mxs_reg_32(hw_bch_blockname)
 	mxs_reg_32(hw_bch_version)
+	mxs_reg_32(hw_bch_debug1)
 };
 #endif
 
@@ -75,6 +76,9 @@ struct mxs_bch_regs {
 
 #define	BCH_MODE_ERASE_THRESHOLD_MASK			0xff
 #define	BCH_MODE_ERASE_THRESHOLD_OFFSET			0
+#define BCH_MODE_ERASE_THRESHOLD(v)			\
+	(((v) << BCH_MODE_ERASE_THRESHOLD_OFFSET) &	\
+	 BCH_MODE_ERASE_THRESHOLD_MASK)
 
 #define	BCH_ENCODEPTR_ADDR_MASK				0xffffffff
 #define	BCH_ENCODEPTR_ADDR_OFFSET			0

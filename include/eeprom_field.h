@@ -14,25 +14,30 @@
 struct eeprom_field {
 	char *name;
 	int size;
-	unsigned char *buf;
 
-	void (*print)(const struct eeprom_field *eeprom_field);
-	int (*update)(struct eeprom_field *eeprom_field, char *value);
+	void (*print)(const struct eeprom_field *eeprom_field, const unsigned char *data);
+	int (*update)(struct eeprom_field *eeprom_field, unsigned char *data, char *value);
+	void (*read)(const struct eeprom_field *eeprom_field, const unsigned char *data, unsigned char *buf);
 };
 
-void eeprom_field_print_bin(const struct eeprom_field *field);
-int eeprom_field_update_bin(struct eeprom_field *field, char *value);
+void eeprom_field_print_bin(const struct eeprom_field *field, const unsigned char *data);
+int eeprom_field_update_bin(struct eeprom_field *field, unsigned char *data, char *value);
+void eeprom_field_read_bin(const struct eeprom_field *field, const unsigned char *data, unsigned char *buf);
 
-void eeprom_field_print_bin_rev(const struct eeprom_field *field);
-int eeprom_field_update_bin_rev(struct eeprom_field *field, char *value);
+void eeprom_field_print_bin_rev(const struct eeprom_field *field, const unsigned char *data);
+int eeprom_field_update_bin_rev(struct eeprom_field *field, unsigned char *data, char *value);
+void eeprom_field_read_bin_rev(const struct eeprom_field *field, const unsigned char *data, unsigned char *buf);
 
-void eeprom_field_print_mac(const struct eeprom_field *field);
-int eeprom_field_update_mac(struct eeprom_field *field, char *value);
+void eeprom_field_print_mac(const struct eeprom_field *field, const unsigned char *data);
+int eeprom_field_update_mac(struct eeprom_field *field, unsigned char *data, char *value);
+void eeprom_field_read_mac(const struct eeprom_field *field, const unsigned char *data, unsigned char *buf);
 
-void eeprom_field_print_ascii(const struct eeprom_field *field);
-int eeprom_field_update_ascii(struct eeprom_field *field, char *value);
+void eeprom_field_print_ascii(const struct eeprom_field *field, const unsigned char *data);
+int eeprom_field_update_ascii(struct eeprom_field *field, unsigned char *data, char *value);
+void eeprom_field_read_ascii(const struct eeprom_field *field, const unsigned char *data, unsigned char *buf);
 
-void eeprom_field_print_reserved(const struct eeprom_field *field);
-int eeprom_field_update_reserved(struct eeprom_field *field, char *value);
+void eeprom_field_print_reserved(const struct eeprom_field *field, const unsigned char *data);
+int eeprom_field_update_reserved(struct eeprom_field *field, unsigned char *data, char *value);
+void eeprom_field_read_reserved(const struct eeprom_field *field, const unsigned char *data, unsigned char *buf);
 
 #endif

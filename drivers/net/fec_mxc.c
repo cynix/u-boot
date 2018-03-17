@@ -1138,6 +1138,11 @@ err1:
 
 int fecmxc_initialize_multi(bd_t *bd, int dev_id, int phy_id, uint32_t addr)
 {
+	return fecmxc_initialize_multi_mii(bd, dev_id, phy_id, addr, addr);
+}
+
+int fecmxc_initialize_multi_mii(bd_t *bd, int dev_id, int phy_id, uint32_t addr, uint32_t addr_mii)
+{
 	uint32_t base_mii;
 	struct mii_dev *bus = NULL;
 #ifdef CONFIG_PHYLIB
@@ -1152,7 +1157,7 @@ int fecmxc_initialize_multi(bd_t *bd, int dev_id, int phy_id, uint32_t addr)
 	 */
 	base_mii = CONFIG_FEC_MXC_MDIO_BASE;
 #else
-	base_mii = addr;
+	base_mii = addr_mii;
 #endif
 	debug("eth_init: fec_probe(bd, %i, %i) @ %08x\n", dev_id, phy_id, addr);
 	bus = fec_get_miibus(base_mii, dev_id);

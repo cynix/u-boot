@@ -9,7 +9,9 @@
 
 #include <common.h>
 #include <asm/mach-imx/iomux-v3.h>
+#include <asm/mach-imx/mxc_i2c.h>
 #include <asm/arch-mx7/mx7-pins.h>
+#include "common.h"
 
 #define PADS_SET(pads_array)						       \
 void cl_som_imx7_##pads_array##_set(void)				       \
@@ -66,6 +68,12 @@ static iomux_v3_cfg_t const espi1_pads[] = {
 PADS_SET(espi1_pads)
 
 #endif /* CONFIG_SPI */
+
+static iomux_v3_cfg_t const wdog_pads[] = {
+	MX7D_PAD_GPIO1_IO00__WDOG1_WDOG_B | MUX_PAD_CTRL(NO_PAD_CTRL),
+};
+
+PADS_SET(wdog_pads)
 
 #ifndef CONFIG_SPL_BUILD
 
@@ -124,6 +132,23 @@ static iomux_v3_cfg_t const fec1_pads[] = {
 
 PADS_SET(fec1_pads)
 
+static iomux_v3_cfg_t const fec2_pads[] = {
+	MX7D_PAD_EPDC_SDCE0__ENET2_RGMII_RX_CTL | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDCLK__ENET2_RGMII_RD0    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDLE__ENET2_RGMII_RD1     | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDOE__ENET2_RGMII_RD2     | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDSHR__ENET2_RGMII_RD3    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDCE1__ENET2_RGMII_RXC    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_GDRL__ENET2_RGMII_TX_CTL  | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDCE2__ENET2_RGMII_TD0    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_SDCE3__ENET2_RGMII_TD1    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_GDCLK__ENET2_RGMII_TD2    | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_GDOE__ENET2_RGMII_TD3     | MUX_PAD_CTRL(ENET_PAD_CTRL),
+	MX7D_PAD_EPDC_GDSP__ENET2_RGMII_TXC     | MUX_PAD_CTRL(ENET_PAD_CTRL),
+};
+
+PADS_SET(fec2_pads)
+
 #endif /* CONFIG_FEC_MXC */
 
 static iomux_v3_cfg_t const usb_otg1_pads[] = {
@@ -132,10 +157,37 @@ static iomux_v3_cfg_t const usb_otg1_pads[] = {
 
 PADS_SET(usb_otg1_pads)
 
-static iomux_v3_cfg_t const wdog_pads[] = {
-	MX7D_PAD_GPIO1_IO00__WDOG1_WDOG_B | MUX_PAD_CTRL(NO_PAD_CTRL),
+#endif /* !CONFIG_SPL_BUILD */
+
+#if defined(CONFIG_SYS_I2C_MXC) || defined(CONFIG_SPL_I2C_SUPPORT)
+
+#define CL_SOM_IMX7_GPIO_I2C2_SCL	IMX_GPIO_NR(1, 6)
+#define CL_SOM_IMX7_GPIO_I2C2_SDA	IMX_GPIO_NR(1, 7)
+
+static struct i2c_pads_info cl_som_imx7_i2c_pad_info2 = {
+	.scl = {
+		.i2c_mode = MX7D_PAD_GPIO1_IO06__I2C2_SCL |
+			MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gpio_mode = MX7D_PAD_GPIO1_IO06__GPIO1_IO6 |
+			MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gp = CL_SOM_IMX7_GPIO_I2C2_SCL,
+	},
+	.sda = {
+		.i2c_mode = MX7D_PAD_GPIO1_IO07__I2C2_SDA |
+			MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gpio_mode = MX7D_PAD_GPIO1_IO07__GPIO1_IO7 |
+			MUX_PAD_CTRL(I2C_PAD_CTRL),
+		.gp = CL_SOM_IMX7_GPIO_I2C2_SDA,
+	},
 };
 
-PADS_SET(wdog_pads)
-
-#endif /* !CONFIG_SPL_BUILD */
+/*
+ * cl_som_imx7_setup_i2c() - I2C  pinmux configuration.
+ */
+void cl_som_imx7_setup_i2c0(void)
+{
+	setup_i2c(0, CONFIG_SYS_I2C_SPEED, 0x7f, &cl_som_imx7_i2c_pad_info2);
+}
+#else /* !CONFIG_SYS_I2C_MXC && !CONFIG_SPL_I2C_SUPPORT */
+void cl_som_imx7_setup_i2c0(void) {}
+#endif /* CONFIG_SYS_I2C_MXC || CONFIG_SPL_I2C_SUPPORT */

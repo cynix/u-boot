@@ -62,6 +62,7 @@
 
 #define CONFIG_PCA953X
 #define CONFIG_CMD_PCA953X
+#define CONFIG_CMD_PCA953X_INFO
 #define CONFIG_SYS_I2C_PCA953X_ADDR	0x20
 #define CONFIG_SYS_I2C_PCA953X_WIDTH	{ {0x20, 16} }
 
@@ -123,6 +124,7 @@
 	"sdboot=setenv mmcdev ${mmcdev_def}; setenv mmcblk 0; run mmcboot\0" \
 	"emmcbootscript=setenv mmcdev 1; setenv mmcblk 2; run mmcbootscript\0" \
 	"emmcboot=setenv mmcdev 1; setenv mmcblk 2; run mmcboot\0" \
+	"stdin=serial,usbkbd\0" \
 	"baseboard_i2c_enable=true\0" \
 
 #define CONFIG_PREBOOT                 "usb start"
@@ -153,6 +155,7 @@
 
 /* SPI Flash support */
 #define CONFIG_SPI
+#define CONFIG_MXC_SPI
 #define CONFIG_SF_DEFAULT_BUS		0
 #define CONFIG_SF_DEFAULT_CS		0
 #define CONFIG_SF_DEFAULT_SPEED		20000000

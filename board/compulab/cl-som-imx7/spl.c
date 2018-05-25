@@ -73,17 +73,6 @@ static struct ddr_phy cl_som_imx7_spl_ddr_phy_regs_val = {
 	.offset_lp_con0	= 0x0000000F,
 };
 
-struct mx7_calibration cl_som_imx7_spl_calib_param = {
-	.num_val	= 5,
-	.values		= {
-		0x0E407304,
-		0x0E447304,
-		0x0E447306,
-		0x0E447304,
-		0x0E407304,
-	},
-};
-
 static void cl_som_imx7_spl_dram_cfg_size(u32 ram_size)
 {
 	switch (ram_size) {
@@ -135,24 +124,31 @@ static void cl_som_imx7_spl_dram_cfg_size(u32 ram_size)
 
 	mx7_dram_cfg(&cl_som_imx7_spl_ddrc_regs_val,
 		     &cl_som_imx7_spl_ddrc_mp_val,
-		     &cl_som_imx7_spl_ddr_phy_regs_val,
-		     &cl_som_imx7_spl_calib_param);
+		     &cl_som_imx7_spl_ddr_phy_regs_val);
 }
+
+#define CL_SOM_IMX7_WD_RESET_VAL 0x1C /* Watchdog reset value */
 
 static void cl_som_imx7_spl_dram_cfg(void)
 {
 	ulong ram_size_test, ram_size = 0;
+	struct wdog_regs *wdog = (struct wdog_regs *)WDOG1_BASE_ADDR;
+	int init_failure;
 
 	for (ram_size = SZ_2G; ram_size >= SZ_256M; ram_size >>= 1) {
-		cl_som_imx7_spl_dram_cfg_size(ram_size);
+		init_failure = cl_som_imx7_spl_dram_cfg_size(ram_size);
+		if (init_failure)
+			break;
 		ram_size_test = get_ram_size((long int *)PHYS_SDRAM, ram_size);
 		if (ram_size_test == ram_size)
 			break;
 	}
 
-	if (ram_size < SZ_256M) {
-		puts("!!!ERROR!!! DRAM detection failed!!!\n");
-		hang();
+	/* Reset the board in case of DRAM initialization failure */
+	if (init_failure || (ram_size < SZ_256M)) {
+		puts("DRAM detection failed!!! Resetting ...\n");
+		cl_som_imx7_wdog_pads_set();
+		clrsetbits_le16(&wdog->wcr, 0, CL_SOM_IMX7_WD_RESET_VAL);
 	}
 }
 
@@ -179,10 +175,12 @@ void board_init_f(ulong dummy)
 	preloader_console_init();
 	/* DRAM detection  */
 	cl_som_imx7_spl_dram_cfg();
+#if 0
 	/* Clear the BSS. */
 	memset(__bss_start, 0, __bss_end - __bss_start);
 	/* load/boot image from boot device */
 	board_init_r(NULL, 0);
+#endif
 }
 
 void spl_board_init(void)

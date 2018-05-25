@@ -19,6 +19,8 @@ PADS_SET_PROT(uart1_pads);
 PADS_SET_PROT(espi1_pads);
 #endif /* CONFIG_SPI */
 
+PADS_SET_PROT(wdog_pads)
+
 #ifndef CONFIG_SPL_BUILD
 #ifdef CONFIG_FSL_ESDHC
 PADS_SET_PROT(usdhc3_emmc_pads);
@@ -38,6 +40,7 @@ extern int cl_som_imx7_base_i2c_init;
 typedef enum {
        CL_SOM_IMX7_SB_SOM,
        CL_SOM_IMX7_SB_IOT,
+       CL_SOM_IMX7_SBC_IOT,
        CL_SOM_IMX7_IOTG,
        CL_SOM_IMX7_OTHER,
 } cl_som_imx7_base;

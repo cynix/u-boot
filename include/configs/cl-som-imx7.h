@@ -257,5 +257,6 @@
 
 /* Miscellaneous */
 #define CONFIG_DISPLAY_BOARDINFO_LATE
+#define CONFIG_SUPPORT_RAW_INITRD
 
 #endif	/* __CONFIG_H */
